@@ -1,0 +1,62 @@
+# ============================================
+# DOCKER COMPOSE - What is this?
+# ============================================
+# Docker Compose lets you define and run multi-container apps.
+# You can define services, networks, volumes, and environment
+# variables in one file. Instead of running multiple docker
+# commands, you just run: docker-compose up
+# ============================================
+
+version: '3.8'
+
+services:
+  # Our event broker service
+  event-broker:
+    # Build the image from the Dockerfile in current directory
+    build:
+      context: .          # Build context (current directory)
+      dockerfile: Dockerfile
+    
+    # Container name (easier to reference)
+    container_name: event-broker
+    
+    # Port mapping: host:container
+    # Access the app at localhost:3000 on your machine
+    ports:
+      - "3000:3000"
+    
+    # Environment variables
+    # These override defaults in config.ts
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - QUEUE_MAX_SIZE=1000
+      - WORKER_COUNT=4
+      - VISIBILITY_TIMEOUT_MS=10000
+      - MAX_RETRIES=5
+    
+    # Volumes: mount host directories to container
+    # This ensures data persists even if container is removed
+    volumes:
+      # Mount ./data on host to /app/data in container
+      - ./data:/app/data
+    
+    # Restart policy
+    # always = restart container if it stops (useful for production)
+    # no = don't restart automatically
+    # unless-stopped = restart unless manually stopped
+    # on-failure = restart only on failure
+    restart: unless-stopped
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s      # Check every 30 seconds
+      timeout: 3s        # Wait 3 seconds for response
+      retries: 3         # Retry 3 times before marking unhealthy
+      start_period: 10s  # Give 10 seconds for app to start
+    
+    # Note: Resource limits can be set via docker run or 
+    # by using docker stack deploy (Docker Swarm mode)
+    # For docker-compose, resource limits are available in newer versions

@@ -1,0 +1,33 @@
+# ============================================
+# DEVELOPMENT DOCKERFILE
+# ============================================
+# Simpler Dockerfile for development.
+# Includes dev dependencies and uses ts-node for hot reload.
+# ============================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* ./
+
+# Install ALL dependencies (including dev deps)
+RUN pnpm install --frozen-lockfile
+
+# Copy source and config
+COPY tsconfig.json ./
+COPY src ./src
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Expose port
+EXPOSE 3000
+
+# Run in development mode with ts-node
+# This allows hot reload without rebuilding
+CMD ["pnpm", "run", "dev"]

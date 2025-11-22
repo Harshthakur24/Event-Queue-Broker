@@ -1,0 +1,34 @@
+# ============================================
+# DOCKER COMPOSE - DEVELOPMENT OVERRIDE
+# ============================================
+# This file extends docker-compose.yml for development.
+# Use it with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Or create a shorter alias: docker-compose up (it will use both files)
+# ============================================
+
+version: '3.8'
+
+services:
+  event-broker:
+    # Override build to include dev dependencies
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    
+    # Override environment for development
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    
+    # Mount source code for hot reload
+    # Changes to .ts files will be reflected without rebuild
+    volumes:
+      - ./src:/app/src          # Mount source code
+      - ./data:/app/data        # Mount data directory
+      - /app/node_modules       # Anonymous volume (prevents overwriting node_modules)
+    
+    # Run in development mode with watch
+    command: pnpm run dev
+    
+    # Don't restart in dev (easier debugging)
+    restart: "no"
