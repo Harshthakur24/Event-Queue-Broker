@@ -90,4 +90,18 @@ export interface Metrics {
         lastEventTime: number;
     };
 }
+export interface HttpRequestSpec {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: any;
+    timeout?: number;
+    callbackUrl?: string;
+}
+export interface HttpRequestResponse {
+    id: string;
+    timestamp: number;
+    status: "queued";
+    message: string;
+}
 //# sourceMappingURL=types.d.ts.map

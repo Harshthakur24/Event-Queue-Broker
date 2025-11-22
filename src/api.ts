@@ -12,6 +12,8 @@ import {
   AcknowledgeResponse,
   BrokerStatus,
   Metrics,
+  HttpRequestSpec,
+  HttpRequestResponse,
 } from "./types";
 
 export function createApiRouter(broker: EventBroker): express.Router {
@@ -53,6 +55,70 @@ export function createApiRouter(broker: EventBroker): express.Router {
       
       const result = await broker.enqueueEvent(payload, topic);
       res.status(202).json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Queue HTTP Request (Request Proxy)
+  router.post("/requests", async (req, res, next) => {
+    try {
+      const requestSpec: HttpRequestSpec = req.body;
+      
+      // Validate request specification
+      if (!requestSpec || typeof requestSpec !== "object") {
+        return res.status(400).json({
+          error: "Request specification must be a valid object",
+          code: "INVALID_REQUEST_SPEC",
+        });
+      }
+
+      if (!requestSpec.url || typeof requestSpec.url !== "string") {
+        return res.status(400).json({
+          error: "URL is required and must be a string",
+          code: "INVALID_URL",
+        });
+      }
+
+      // Validate URL format
+      try {
+        new URL(requestSpec.url);
+      } catch (error) {
+        return res.status(400).json({
+          error: `Invalid URL format: ${requestSpec.url}`,
+          code: "INVALID_URL_FORMAT",
+        });
+      }
+
+      // Validate method if provided
+      if (requestSpec.method) {
+        const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+        if (!validMethods.includes(requestSpec.method.toUpperCase())) {
+          return res.status(400).json({
+            error: `Invalid HTTP method. Must be one of: ${validMethods.join(", ")}`,
+            code: "INVALID_METHOD",
+          });
+        }
+      }
+
+      // Create payload for event
+      const payload = {
+        type: "http_request",
+        ...requestSpec,
+      };
+
+      const topic = (req.query.topic as string | undefined) || "http_requests";
+      
+      const result = await broker.enqueueEvent(payload, topic);
+      
+      const response: HttpRequestResponse = {
+        id: result.id,
+        timestamp: result.timestamp,
+        status: "queued",
+        message: "HTTP request queued and will be executed by workers",
+      };
+      
+      res.status(202).json(response);
     } catch (error) {
       next(error);
     }

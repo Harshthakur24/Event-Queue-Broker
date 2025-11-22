@@ -97,3 +97,19 @@ export interface Metrics {
     lastEventTime: number;
   };
 }
+
+export interface HttpRequestSpec {
+  url: string;
+  method?: string; // GET, POST, PUT, DELETE, etc. (default: GET)
+  headers?: Record<string, string>;
+  body?: any; // Can be object, string, or Buffer
+  timeout?: number; // Timeout in milliseconds (default: 30000)
+  callbackUrl?: string; // Optional callback URL to send response to
+}
+
+export interface HttpRequestResponse {
+  id: string;
+  timestamp: number;
+  status: "queued";
+  message: string;
+}

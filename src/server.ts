@@ -17,7 +17,8 @@ import { getConfig, BrokerConfig } from "./config";
 import { Storage } from "./storage";
 import { EventBroker } from "./broker";
 import { createApiRouter } from "./api";
-import { EventRecord } from "./types";
+import { EventRecord, HttpRequestSpec } from "./types";
+import { executeHttpRequest, sendCallback, HttpRequestResult } from "./http-client";
 
 function log(message: string, ...args: any[]) {
   const timestamp = new Date().toISOString();
@@ -43,6 +44,51 @@ async function startServer() {
   // Set to undefined to disable automatic processing and use manual consumption only
   // You can replace this with your own event processing logic
   const eventHandler = async (record: EventRecord): Promise<void> => {
+    // Handle HTTP request events
+    if (record.payload?.type === "http_request") {
+      try {
+        const requestSpec: HttpRequestSpec = {
+          url: record.payload.url,
+          method: record.payload.method || "GET",
+          headers: record.payload.headers,
+          body: record.payload.body,
+          timeout: record.payload.timeout || 30000,
+          callbackUrl: record.payload.callbackUrl,
+        };
+
+        console.log(`[Worker] Executing HTTP request ${record.id} to ${requestSpec.url}`);
+        
+        // Execute the HTTP request
+        const result: HttpRequestResult = await executeHttpRequest(requestSpec);
+        
+        if (result.success) {
+          console.log(`[Worker] HTTP request ${record.id} succeeded with status ${result.response?.statusCode}`);
+        } else {
+          console.error(`[Worker] HTTP request ${record.id} failed:`, result.error);
+        }
+
+        // Send callback if callback URL is provided
+        if (requestSpec.callbackUrl && result) {
+          try {
+            await sendCallback(requestSpec.callbackUrl, result);
+            console.log(`[Worker] Callback sent to ${requestSpec.callbackUrl} for request ${record.id}`);
+          } catch (error) {
+            console.error(`[Worker] Failed to send callback for request ${record.id}:`, error);
+          }
+        }
+
+        // Throw error if request failed (so it goes to retry/DLQ)
+        if (!result.success) {
+          throw new Error(`HTTP request failed: ${result.error}`);
+        }
+      } catch (error: any) {
+        console.error(`[Worker] Error processing HTTP request ${record.id}:`, error);
+        throw error;
+      }
+      return;
+    }
+
+    // Default processing for other event types
     // Example: Process the event
     // In a real system, this might call an external API, write to a database, etc.
     console.log(`[Worker] Processing event ${record.id}:`, record.payload);
@@ -92,6 +138,7 @@ async function startServer() {
       endpoints: {
         health: "GET /api/health",
         enqueue: "POST /api/events",
+        queueRequest: "POST /api/requests",
         consume: "GET /api/events/consume",
         acknowledge: "POST /api/events/acknowledge",
         nack: "POST /api/events/:receiptId/nack",
